@@ -6,10 +6,11 @@ from PIL import Image
 import pytesseract
 import re
 
+# 保存先
 TEMP_IMAGE_DIR = "./tmp"
 CSV_LOG_PATH = "./upload_log.csv"
 
-# 初期化
+# セッション初期化
 if "uploaded_file" not in st.session_state:
     st.session_state.uploaded_file = None
 if "confirmed" not in st.session_state:
@@ -19,12 +20,11 @@ if "editing" not in st.session_state:
 if "plate_info" not in st.session_state:
     st.session_state.plate_info = {}
 
-# OCRによるナンバー抽出
+# OCRナンバー抽出
 def extract_plate_info(uploaded_file):
-    image = Image.open(uploaded_file).convert("L")  # グレースケール
+    image = Image.open(uploaded_file).convert("L")
     text = pytesseract.image_to_string(image, lang="jpn")
 
-    # ナンバーの形式：「依知川 111 い 2525」 などを想定
     match = re.search(r"(?P<region>[\u4E00-\u9FFF]+)[\s　]*(?P<class>\d{3})[\s　]*(?P<kana>[ぁ-んア-ン])[\s　\-]*(?P<number>\d{2,4})", text)
     if match:
         return {
@@ -63,21 +63,22 @@ def update_csv_log(image_filename, plate_info):
         df = pd.DataFrame([data])
     df.to_csv(CSV_LOG_PATH, index=False)
 
-# UI
+# UI開始
 st.set_page_config(page_title="カーレジスター", layout="centered")
 st.title("竹山")
 
 # ステップ1：アップロード
 if not st.session_state.uploaded_file:
-    uploaded_file = st.file_uploader("ナンバープレートを撮影してください。", type=["jpg", "jpeg", "png"])
+    uploaded_file = st.file_uploader("ナンバープレートを撮影してください（カメラ対応）", type=["jpg", "jpeg", "png"])
     if uploaded_file:
         st.session_state.uploaded_file = uploaded_file
         st.session_state.plate_info = extract_plate_info(uploaded_file)
+        st.rerun()  # ⭐ 再描画して即反映
 
 # ステップ2：確認 or 修正
 elif not st.session_state.confirmed:
 
-    st.image(st.session_state.uploaded_file, caption="アップロードされた画像", use_column_width=True)
+    st.image(st.session_state.uploaded_file, caption="アップロードされた画像", use_container_width=True)
 
     if not st.session_state.editing:
         st.markdown("### このナンバーで間違いありませんか？")
@@ -93,9 +94,11 @@ elif not st.session_state.confirmed:
         with col1:
             if st.button("登録する"):
                 st.session_state.confirmed = True
+                st.rerun()
         with col2:
             if st.button("修正する"):
                 st.session_state.editing = True
+                st.rerun()
 
     else:
         st.markdown("### ナンバー情報を修正してください")
@@ -110,11 +113,12 @@ elif not st.session_state.confirmed:
             if st.button("登録する（修正完了）"):
                 st.session_state.confirmed = True
                 st.session_state.editing = False
+                st.rerun()
         with col2:
             if st.button("アップロードからやり直す"):
                 for key in ["uploaded_file", "confirmed", "editing", "plate_info"]:
                     st.session_state.pop(key, None)
-                st.experimental_rerun()
+                st.rerun()
 
 # ステップ3：登録完了
 else:
@@ -132,9 +136,9 @@ else:
     - かな：{plate['かな']}
     - 車番：{plate['車番']}
     """)
-    st.image(st.session_state.uploaded_file, caption="登録されたナンバープレート", use_column_width=True)
+    st.image(st.session_state.uploaded_file, caption="登録された画像", use_container_width=True)
 
     if st.button("トップに戻る"):
         for key in ["uploaded_file", "confirmed", "editing", "plate_info"]:
             st.session_state.pop(key, None)
-        st.experimental_rerun()
+        st.rerun()
