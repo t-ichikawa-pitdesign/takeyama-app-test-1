@@ -1,12 +1,44 @@
 import streamlit as st
 import pandas as pd
 import os
-import tempfile
 from datetime import datetime
+from PIL import Image
+import pytesseract
+import re
 
-# 一時保存先
 TEMP_IMAGE_DIR = "./tmp"
 CSV_LOG_PATH = "./upload_log.csv"
+
+# 初期化
+if "uploaded_file" not in st.session_state:
+    st.session_state.uploaded_file = None
+if "confirmed" not in st.session_state:
+    st.session_state.confirmed = False
+if "editing" not in st.session_state:
+    st.session_state.editing = False
+if "plate_info" not in st.session_state:
+    st.session_state.plate_info = {}
+
+# OCRによるナンバー抽出
+def extract_plate_info(uploaded_file):
+    image = Image.open(uploaded_file).convert("L")  # グレースケール
+    text = pytesseract.image_to_string(image, lang="jpn")
+
+    # ナンバーの形式：「依知川 111 い 2525」 などを想定
+    match = re.search(r"(?P<region>[\u4E00-\u9FFF]+)[\s　]*(?P<class>\d{3})[\s　]*(?P<kana>[ぁ-んア-ン])[\s　\-]*(?P<number>\d{2,4})", text)
+    if match:
+        return {
+            "地域": match.group("region"),
+            "クラス": match.group("class"),
+            "かな": match.group("kana"),
+            "車番": match.group("number")
+        }
+    return {
+        "地域": "不明",
+        "クラス": "",
+        "かな": "",
+        "車番": ""
+    }
 
 def dummy_ssh_upload(local_image_path, remote_path="/dummy/path"):
     st.info(f"[SSH送信スキップ] 本来は {local_image_path} を {remote_path} にアップロードします。")
@@ -18,10 +50,11 @@ def save_temp_image(uploaded_file):
         f.write(uploaded_file.getbuffer())
     return save_path
 
-def update_csv_log(image_filename):
+def update_csv_log(image_filename, plate_info):
     data = {
         "filename": image_filename,
-        "uploaded_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        "uploaded_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        **plate_info
     }
     if os.path.exists(CSV_LOG_PATH):
         df = pd.read_csv(CSV_LOG_PATH)
@@ -30,38 +63,78 @@ def update_csv_log(image_filename):
         df = pd.DataFrame([data])
     df.to_csv(CSV_LOG_PATH, index=False)
 
+# UI
 st.set_page_config(page_title="カーレジスター", layout="centered")
 st.title("竹山")
 
-# カメラ起動をサポートするHTML input（streamlit標準ではできないため裏技）
-uploaded_file = st.file_uploader("ナンバープレートを撮影してください。", type=["jpg", "jpeg", "png"])
+# ステップ1：アップロード
+if not st.session_state.uploaded_file:
+    uploaded_file = st.file_uploader("ナンバープレートを撮影してください。", type=["jpg", "jpeg", "png"])
+    if uploaded_file:
+        st.session_state.uploaded_file = uploaded_file
+        st.session_state.plate_info = extract_plate_info(uploaded_file)
 
-# カメラ起動に対応したraw HTMLも追加（スマホ対応用）
-st.markdown(
-    """
-    <input type="file" accept="image/*" capture="environment"
-           onchange="document.getElementById('fileUploader').dispatchEvent(new Event('change'))"
-           style="margin-bottom: 20px;" />
-    """,
-    unsafe_allow_html=True
-)
+# ステップ2：確認 or 修正
+elif not st.session_state.confirmed:
 
-if uploaded_file:
-    with st.spinner("処理中..."):
-        temp_path = save_temp_image(uploaded_file)
+    st.image(st.session_state.uploaded_file, caption="アップロードされた画像", use_column_width=True)
+
+    if not st.session_state.editing:
+        st.markdown("### このナンバーで間違いありませんか？")
+        plate = st.session_state.plate_info
+        st.markdown(f"""
+        - 地域：{plate['地域']}
+        - クラス：{plate['クラス']}
+        - かな：{plate['かな']}
+        - 車番：{plate['車番']}
+        """)
+
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("登録する"):
+                st.session_state.confirmed = True
+        with col2:
+            if st.button("修正する"):
+                st.session_state.editing = True
+
+    else:
+        st.markdown("### ナンバー情報を修正してください")
+        plate = st.session_state.plate_info
+        plate["地域"] = st.text_input("地域", plate["地域"])
+        plate["クラス"] = st.text_input("クラス", plate["クラス"])
+        plate["かな"] = st.text_input("かな", plate["かな"])
+        plate["車番"] = st.text_input("車番", plate["車番"])
+
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("登録する（修正完了）"):
+                st.session_state.confirmed = True
+                st.session_state.editing = False
+        with col2:
+            if st.button("アップロードからやり直す"):
+                for key in ["uploaded_file", "confirmed", "editing", "plate_info"]:
+                    st.session_state.pop(key, None)
+                st.experimental_rerun()
+
+# ステップ3：登録完了
+else:
+    with st.spinner("登録中..."):
+        temp_path = save_temp_image(st.session_state.uploaded_file)
         dummy_ssh_upload(temp_path)
-        update_csv_log(uploaded_file.name)
+        update_csv_log(st.session_state.uploaded_file.name, st.session_state.plate_info)
 
-    # 成功メッセージと仮のナンバー情報
     st.success("お車を登録しました！ ✅")
     st.markdown("### 以下の内容で登録しました：")
-    st.markdown("""
-    - 地域：依知川
-    - クラス：111
-    - かな：い
-    - 車番：2525
+    plate = st.session_state.plate_info
+    st.markdown(f"""
+    - 地域：{plate['地域']}
+    - クラス：{plate['クラス']}
+    - かな：{plate['かな']}
+    - 車番：{plate['車番']}
     """)
+    st.image(st.session_state.uploaded_file, caption="登録されたナンバープレート", use_column_width=True)
 
-    # トップに戻るボタン（ページ再読み込み）
     if st.button("トップに戻る"):
+        for key in ["uploaded_file", "confirmed", "editing", "plate_info"]:
+            st.session_state.pop(key, None)
         st.experimental_rerun()
