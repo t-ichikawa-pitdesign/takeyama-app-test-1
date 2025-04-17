@@ -1,14 +1,18 @@
 import streamlit as st
 import pandas as pd
 import os
+import socket
 from datetime import datetime
 from PIL import Image
 import pytesseract
 import re
 
-# 保存先
+# 保存先パス
 TEMP_IMAGE_DIR = "./tmp"
 CSV_LOG_PATH = "./upload_log.csv"
+
+# ✅ OCRを使うかどうか（ホスト名から判定）
+USE_OCR = not socket.gethostname().startswith("streamlit")  # Streamlit CloudではFalse
 
 # セッション初期化
 if "uploaded_file" not in st.session_state:
@@ -20,7 +24,7 @@ if "editing" not in st.session_state:
 if "plate_info" not in st.session_state:
     st.session_state.plate_info = {}
 
-# OCRナンバー抽出
+# OCRでナンバー抽出
 def extract_plate_info(uploaded_file):
     image = Image.open(uploaded_file).convert("L")
     text = pytesseract.image_to_string(image, lang="jpn")
@@ -63,7 +67,7 @@ def update_csv_log(image_filename, plate_info):
         df = pd.DataFrame([data])
     df.to_csv(CSV_LOG_PATH, index=False)
 
-# UI開始
+# UI
 st.set_page_config(page_title="カーレジスター", layout="centered")
 st.title("竹山")
 
@@ -72,8 +76,16 @@ if not st.session_state.uploaded_file:
     uploaded_file = st.file_uploader("ナンバープレートを撮影してください（カメラ対応）", type=["jpg", "jpeg", "png"])
     if uploaded_file:
         st.session_state.uploaded_file = uploaded_file
-        st.session_state.plate_info = extract_plate_info(uploaded_file)
-        st.rerun()  # ⭐ 再描画して即反映
+        if USE_OCR:
+            st.session_state.plate_info = extract_plate_info(uploaded_file)
+        else:
+            st.session_state.plate_info = {
+                "地域": "依知川",
+                "クラス": "111",
+                "かな": "い",
+                "車番": "2525"
+            }
+        st.rerun()
 
 # ステップ2：確認 or 修正
 elif not st.session_state.confirmed:
@@ -128,8 +140,8 @@ else:
         update_csv_log(st.session_state.uploaded_file.name, st.session_state.plate_info)
 
     st.success("お車を登録しました！ ✅")
-    st.markdown("### 以下の内容で登録しました：")
     plate = st.session_state.plate_info
+    st.markdown("### 以下の内容で登録しました：")
     st.markdown(f"""
     - 地域：{plate['地域']}
     - クラス：{plate['クラス']}
