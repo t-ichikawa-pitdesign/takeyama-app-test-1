@@ -11,7 +11,8 @@ import re
 TEMP_IMAGE_DIR = "./tmp"
 CSV_LOG_PATH = "./upload_log.csv"
 
-USE_OCR = os.environ.get("STREAMLIT_CLOUD", "false").lower() != "true"
+# USE_OCR = os.environ.get("STREAMLIT_CLOUD", "false").lower() != "true"
+USE_OCR = False
 
 # セッション初期化
 if "uploaded_file" not in st.session_state:
