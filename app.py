@@ -11,7 +11,7 @@ import re
 TEMP_IMAGE_DIR = "./tmp"
 CSV_LOG_PATH = "./upload_log.csv"
 
-# USE_OCR = os.environ.get("STREAMLIT_CLOUD", "false").lower() != "true"
+# OCRを使うかどうか（今回は固定でOFF）
 USE_OCR = False
 
 # セッション初期化
@@ -43,9 +43,6 @@ def extract_plate_info(uploaded_file):
         "かな": "",
         "車番": ""
     }
-
-# def dummy_ssh_upload(local_image_path, remote_path="/dummy/path"):
-#     st.info(f"[SSH送信スキップ] 本来は {local_image_path} を {remote_path} にアップロードします。")
 
 def save_temp_image(uploaded_file):
     os.makedirs(TEMP_IMAGE_DIR, exist_ok=True)
@@ -90,10 +87,8 @@ if not st.session_state.uploaded_file:
 # ステップ2：確認 or 修正
 elif not st.session_state.confirmed:
 
-    st.image(st.session_state.uploaded_file, caption="アップロードされた画像", use_container_width=True)
-
     if not st.session_state.editing:
-        st.markdown("### このナンバーで間違いありませんか？")
+        st.markdown('<p style="font-size:16px; font-weight:600;">このナンバーで間違いありませんか？</p>', unsafe_allow_html=True)
         plate = st.session_state.plate_info
         st.markdown(f"""
         - 地域：{plate['地域']}
@@ -101,6 +96,8 @@ elif not st.session_state.confirmed:
         - かな：{plate['かな']}
         - 車番：{plate['車番']}
         """)
+
+        st.image(st.session_state.uploaded_file, caption="アップロードされた画像", use_container_width=True)
 
         col1, col2 = st.columns(2)
         with col1:
@@ -113,12 +110,15 @@ elif not st.session_state.confirmed:
                 st.rerun()
 
     else:
-        st.markdown("### ナンバー情報を修正してください")
+        st.markdown('<p style="font-size:16px; font-weight:600;">ナンバー情報を修正してください</p>', unsafe_allow_html=True)
+
         plate = st.session_state.plate_info
         plate["地域"] = st.text_input("地域", plate["地域"])
         plate["クラス"] = st.text_input("クラス", plate["クラス"])
         plate["かな"] = st.text_input("かな", plate["かな"])
         plate["車番"] = st.text_input("車番", plate["車番"])
+
+        st.image(st.session_state.uploaded_file, caption="アップロードされた画像", use_container_width=True)
 
         col1, col2 = st.columns(2)
         with col1:
@@ -136,7 +136,6 @@ elif not st.session_state.confirmed:
 else:
     with st.spinner("登録中..."):
         temp_path = save_temp_image(st.session_state.uploaded_file)
-        # dummy_ssh_upload(temp_path)
         update_csv_log(st.session_state.uploaded_file.name, st.session_state.plate_info)
 
     st.success("お車を登録しました！ ✅")
