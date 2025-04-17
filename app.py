@@ -11,7 +11,8 @@ import re
 TEMP_IMAGE_DIR = "./tmp"
 CSV_LOG_PATH = "./upload_log.csv"
 
-USE_OCR = os.environ.get("STREAMLIT_CLOUD", "false").lower() != "true"
+# USE_OCR = os.environ.get("STREAMLIT_CLOUD", "false").lower() != "true"
+USE_OCR = False
 
 # セッション初期化
 if "uploaded_file" not in st.session_state:
@@ -72,7 +73,7 @@ st.title("竹山")
 
 # ステップ1：アップロード
 if not st.session_state.uploaded_file:
-    uploaded_file = st.file_uploader("ナンバープレートを撮影してください（カメラ対応）", type=["jpg", "jpeg", "png"])
+    uploaded_file = st.file_uploader("ナンバープレートを撮影してください。", type=["jpg", "jpeg", "png"])
     if uploaded_file:
         st.session_state.uploaded_file = uploaded_file
         if USE_OCR:
