@@ -44,8 +44,8 @@ def extract_plate_info(uploaded_file):
         "車番": ""
     }
 
-def dummy_ssh_upload(local_image_path, remote_path="/dummy/path"):
-    st.info(f"[SSH送信スキップ] 本来は {local_image_path} を {remote_path} にアップロードします。")
+# def dummy_ssh_upload(local_image_path, remote_path="/dummy/path"):
+#     st.info(f"[SSH送信スキップ] 本来は {local_image_path} を {remote_path} にアップロードします。")
 
 def save_temp_image(uploaded_file):
     os.makedirs(TEMP_IMAGE_DIR, exist_ok=True)
@@ -136,7 +136,7 @@ elif not st.session_state.confirmed:
 else:
     with st.spinner("登録中..."):
         temp_path = save_temp_image(st.session_state.uploaded_file)
-        dummy_ssh_upload(temp_path)
+        # dummy_ssh_upload(temp_path)
         update_csv_log(st.session_state.uploaded_file.name, st.session_state.plate_info)
 
     st.success("お車を登録しました！ ✅")
