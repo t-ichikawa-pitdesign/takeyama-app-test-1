@@ -77,10 +77,10 @@ if not st.session_state.uploaded_file:
             st.session_state.plate_info = extract_plate_info(uploaded_file)
         else:
             st.session_state.plate_info = {
-                "地域": "依知川",
-                "クラス": "111",
-                "かな": "い",
-                "車番": "2525"
+                "地域": "日本",
+                "クラス": "001",
+                "かな": "あ",
+                "車番": "2020"
             }
         st.rerun()
 
